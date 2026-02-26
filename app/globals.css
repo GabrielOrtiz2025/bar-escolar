@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-dm-sans: 'DM Sans', sans-serif;
+  --font-syne: 'Syne', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: #f5f0e8;
+  color: #0d0d0d;
+  font-family: var(--font-dm-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Botones grandes táctiles */
+.btn-primary {
+  @apply bg-brand-ink text-white font-display font-bold rounded-xl px-6 py-4 text-base
+         active:scale-95 transition-all duration-150 cursor-pointer select-none
+         hover:bg-brand-orange disabled:opacity-40 disabled:cursor-not-allowed;
+}
+
+.btn-green {
+  @apply bg-semaforo-green text-white font-display font-bold rounded-xl px-6 py-4 text-base
+         active:scale-95 transition-all duration-150 cursor-pointer select-none
+         hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed;
+}
+
+.btn-outline {
+  @apply bg-transparent text-brand-ink font-display font-bold rounded-xl px-6 py-4 text-base
+         border-2 border-black/10 active:scale-95 transition-all duration-150 cursor-pointer select-none
+         hover:bg-brand-cream disabled:opacity-40 disabled:cursor-not-allowed;
+}
+
+.btn-red {
+  @apply bg-semaforo-red text-white font-display font-bold rounded-xl px-6 py-4 text-base
+         active:scale-95 transition-all duration-150 cursor-pointer select-none;
+}
+
+/* Cards */
+.card {
+  @apply bg-white rounded-2xl p-6 border border-black/8 shadow-sm;
+}
+
+/* Semáforo badges */
+.badge-green {
+  @apply bg-semaforo-green-light text-semaforo-green font-bold rounded-full px-3 py-1 text-sm;
+}
+.badge-yellow {
+  @apply bg-semaforo-yellow-light text-semaforo-yellow font-bold rounded-full px-3 py-1 text-sm;
+}
+.badge-red {
+  @apply bg-semaforo-red-light text-semaforo-red font-bold rounded-full px-3 py-1 text-sm;
+}
+
+/* Inputs */
+.input {
+  @apply w-full px-4 py-3 rounded-xl border-2 border-black/10 bg-white
+         font-sans text-base focus:outline-none focus:border-brand-orange transition-colors;
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: fadeIn 0.3s ease forwards;
+}
