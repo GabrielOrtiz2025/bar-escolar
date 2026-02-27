@@ -56,10 +56,17 @@ export interface Pago {
 }
 
 export interface SaldoAlumno {
+  id: string
   alumno_id: string
+  nombre: string
+  apellido: string
   nombre_completo: string
   nivel: string
   paralelo: string
+  alergias?: string
+  requiere_factura: boolean
+  representante_nombre?: string
+  representante_telefono?: string
   total_pagado: number
   total_consumido: number
   saldo_actual: number
