@@ -5,46 +5,45 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
 
-// ============================================
-// TIPOS DE DATOS — Espejo de tus tablas en Supabase
-// ============================================
+// ============ TIPOS ============
 
 export type Alumno = {
   id: string
+  nivel: string
+  paralelo: string
   nombre: string
-  grado: string
+  apellido: string
+  codigo: string
   alergias: string | null
+  requiere_factura: boolean
+  representante_nombre: string | null
+  representante_telefono: string | null
+  modalidad_pago: 'diario' | 'quincenal' | 'mensual'
   activo: boolean
   created_at: string
 }
 
-export type SaldoAlumno = {
-  id: string
-  nombre: string
-  grado: string
-  alergias: string | null
-  activo: boolean
+export type SaldoAlumno = Alumno & {
   total_pagado: number
   total_consumido: number
   saldo_actual: number
 }
 
-export type Precio = {
+export type Producto = {
   id: string
-  tipo_menu: string
-  monto: number
-  vigente_desde: string
-  vigente_hasta: string | null
-  created_at: string
+  nombre: string
+  precio: number
+  activo: boolean
+  orden: number
 }
 
 export type Consumo = {
   id: string
   alumno_id: string
+  producto_id: string
+  producto_nombre: string
+  monto: number
   fecha: string
-  tipo_menu: string
-  monto_cobrado: number
-  ausente: boolean
   created_at: string
 }
 
@@ -52,25 +51,22 @@ export type Pago = {
   id: string
   alumno_id: string
   monto: number
-  fecha: string
+  metodo: 'efectivo' | 'transferencia'
+  numero_comprobante: string | null
   comprobante_url: string | null
   notas: string | null
-  created_at: string
+  fecha: string
 }
 
-// ============================================
-// HELPERS
-// ============================================
+// ============ HELPERS ============
 
-// Devuelve el color del semáforo según el saldo y el precio actual del menú
-export function getSemaforo(saldo: number, precioMenu: number): 'green' | 'yellow' | 'red' {
+export function getSemaforo(saldo: number, precioPromedio: number = 5): 'green' | 'yellow' | 'red' {
   if (saldo <= 0) return 'red'
-  if (saldo < precioMenu * 3) return 'yellow' // menos de 3 días de saldo
+  if (saldo < precioPromedio * 3) return 'yellow'
   return 'green'
 }
 
-// Formatea un número como moneda en dólares
-export function formatDolar(monto: number): string {
+export function formatUSD(monto: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -78,11 +74,19 @@ export function formatDolar(monto: number): string {
   }).format(monto)
 }
 
-// Formatea una fecha legible en español
 export function formatFecha(fecha: string): string {
-  return new Date(fecha).toLocaleDateString('es-AR', {
+  return new Date(fecha + (fecha.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('es-EC', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   })
 }
+
+export function hoy(): string {
+  return new Date().toISOString().split('T')[0]
+}
+
+export function nombreCompleto(a: { nombre: string; apellido: string; nivel: string; paralelo: string }): string {
+  return `${a.nivel}${a.paralelo} — ${a.nombre} ${a.apellido}`
+}
+
