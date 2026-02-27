@@ -57,6 +57,9 @@ export function formatDolar(monto: number): string {
   return `$${monto.toFixed(2)}`
 }
 
+// Alias para compatibilidad
+export const formatUSD = formatDolar
+
 // Función helper para obtener el código del alumno
 export function getCodigoAlumno(alumno: Alumno): string {
   return `${alumno.nivel}${alumno.paralelo}`
