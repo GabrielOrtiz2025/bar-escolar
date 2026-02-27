@@ -5,88 +5,69 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
 
-// ============ TIPOS ============
-
-export type Alumno = {
+// Tipos de datos
+export interface Alumno {
   id: string
   nivel: string
   paralelo: string
   nombre: string
   apellido: string
-  codigo: string
-  alergias: string | null
+  alergias?: string
   requiere_factura: boolean
-  representante_nombre: string | null
-  representante_telefono: string | null
-  modalidad_pago: 'diario' | 'quincenal' | 'mensual'
+  representante_nombre?: string
+  representante_telefono?: string
   activo: boolean
   created_at: string
 }
 
-export type SaldoAlumno = Alumno & {
-  total_pagado: number
-  total_consumido: number
-  saldo_actual: number
-}
-
-export type Producto = {
+export interface Producto {
   id: string
   nombre: string
   precio: number
   activo: boolean
-  orden: number
-}
-
-export type Consumo = {
-  id: string
-  alumno_id: string
-  producto_id: string
-  producto_nombre: string
-  monto: number
-  fecha: string
   created_at: string
 }
 
-export type Pago = {
+export interface Consumo {
+  id: string
+  alumno_id: string
+  producto_id: string
+  fecha: string
+  monto_cobrado: number
+  created_at: string
+  alumno?: Alumno
+  producto?: Producto
+}
+
+export interface Pago {
   id: string
   alumno_id: string
   monto: number
-  metodo: 'efectivo' | 'transferencia'
-  numero_comprobante: string | null
-  comprobante_url: string | null
-  notas: string | null
+  tipo_pago: 'efectivo' | 'transferencia'
+  numero_comprobante?: string
+  comprobante_url?: string
+  notas?: string
   fecha: string
+  created_at: string
+  alumno?: Alumno
 }
 
-// ============ HELPERS ============
-
-export function getSemaforo(saldo: number, precioPromedio: number = 5): 'green' | 'yellow' | 'red' {
-  if (saldo <= 0) return 'red'
-  if (saldo < precioPromedio * 3) return 'yellow'
-  return 'green'
+// Función helper para formatear montos en dólares
+export function formatDolar(monto: number): string {
+  return `$${monto.toFixed(2)}`
 }
 
-export function formatUSD(monto: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(monto)
+// Función helper para obtener el código del alumno
+export function getCodigoAlumno(alumno: Alumno): string {
+  return `${alumno.nivel}${alumno.paralelo}`
 }
 
-export function formatFecha(fecha: string): string {
-  return new Date(fecha + (fecha.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('es-EC', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
+// Función helper para obtener el nombre completo del alumno
+export function getNombreCompleto(alumno: Alumno): string {
+  return `${alumno.nombre} ${alumno.apellido}`
 }
 
-export function hoy(): string {
-  return new Date().toISOString().split('T')[0]
+// Función helper para obtener el identificador completo del alumno
+export function getIdentificadorCompleto(alumno: Alumno): string {
+  return `${alumno.nivel}${alumno.paralelo} - ${alumno.nombre} ${alumno.apellido}`
 }
-
-export function nombreCompleto(a: { nombre: string; apellido: string; nivel: string; paralelo: string }): string {
-  return `${a.nivel}${a.paralelo} — ${a.nombre} ${a.apellido}`
-}
-
