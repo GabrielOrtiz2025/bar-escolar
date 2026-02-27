@@ -96,3 +96,26 @@ export function getNombreCompleto(alumno: Alumno): string {
 export function getIdentificadorCompleto(alumno: Alumno): string {
   return `${alumno.nivel}${alumno.paralelo} - ${alumno.nombre} ${alumno.apellido}`
 }
+
+// Función helper para determinar el estado del semáforo según el saldo
+export function getSemaforo(saldo: number): { color: string; texto: string; bgColor: string } {
+  if (saldo <= 0) {
+    return { 
+      color: 'text-red-600', 
+      texto: 'Sin crédito',
+      bgColor: 'bg-red-50 border-red-200'
+    }
+  } else if (saldo <= 5) {
+    return { 
+      color: 'text-yellow-600', 
+      texto: 'Saldo bajo',
+      bgColor: 'bg-yellow-50 border-yellow-200'
+    }
+  } else {
+    return { 
+      color: 'text-green-600', 
+      texto: 'Saldo OK',
+      bgColor: 'bg-green-50 border-green-200'
+    }
+  }
+}
