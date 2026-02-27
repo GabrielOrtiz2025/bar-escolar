@@ -82,6 +82,15 @@ export function formatFechaHora(fecha: string | Date): string {
   })
 }
 
+// Función helper para obtener la fecha de hoy en formato YYYY-MM-DD
+export function hoy(): string {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // Función helper para obtener el código del alumno
 export function getCodigoAlumno(alumno: Alumno): string {
   return `${alumno.nivel}${alumno.paralelo}`
