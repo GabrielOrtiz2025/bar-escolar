@@ -14,6 +14,7 @@ export interface Alumno {
   apellido: string
   alergias?: string
   requiere_factura: boolean
+  modalidad_pago?: string
   representante_nombre?: string
   representante_telefono?: string
   activo: boolean
@@ -65,8 +66,10 @@ export interface SaldoAlumno {
   paralelo: string
   alergias?: string
   requiere_factura: boolean
+  modalidad_pago?: string
   representante_nombre?: string
   representante_telefono?: string
+  activo: boolean
   total_pagado: number
   total_consumido: number
   saldo_actual: number
