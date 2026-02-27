@@ -1,107 +1,61 @@
 'use client'
-
 import { useEffect, useState } from 'react'
-import { supabase, getSemaforo, formatDolar, type SaldoAlumno } from '../lib/supabase'
+import { supabase, formatUSD, type SaldoAlumno } from '../lib/supabase'
 import Link from 'next/link'
 
 export default function AlumnosPage() {
   const [alumnos, setAlumnos] = useState<SaldoAlumno[]>([])
-  const [precioMenu, setPrecioMenu] = useState(0)
-  const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
-  const [filtroGrado, setFiltroGrado] = useState('Todos')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function cargar() {
-      const { data: saldosData } = await supabase.from('saldos').select('*').eq('activo', true).order('nombre')
-      const { data: precioData } = await supabase.from('precios').select('*').eq('tipo_menu', 'Almuerzo').is('vigente_hasta', null).single()
-      if (saldosData) setAlumnos(saldosData)
-      if (precioData) setPrecioMenu(precioData.monto)
-      setLoading(false)
-    }
-    cargar()
+    supabase.from('saldos').select('*').eq('activo', true).order('nivel').order('paralelo').order('apellido')
+      .then(({ data }) => { if (data) setAlumnos(data); setLoading(false) })
   }, [])
 
-  const grados = ['Todos', ...Array.from(new Set(alumnos.map(a => a.grado))).sort()]
-  const filtrados = alumnos
-    .filter(a => filtroGrado === 'Todos' || a.grado === filtroGrado)
-    .filter(a => a.nombre.toLowerCase().includes(busqueda.toLowerCase()))
+  const filtrados = alumnos.filter(a =>
+    `${a.nivel}${a.paralelo} ${a.nombre} ${a.apellido}`.toLowerCase().includes(busqueda.toLowerCase())
+  )
 
-  if (loading) return <div className="flex items-center justify-center h-64"><p className="font-display font-bold text-xl animate-pulse">Cargando alumnos...</p></div>
+  if (loading) return <div className="flex items-center justify-center h-64"><p className="font-bold animate-pulse">Cargando...</p></div>
 
   return (
-    <div className="p-8 animate-in">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-6 fade-in">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-display font-black text-3xl tracking-tight mb-1">Alumnos</h1>
-          <p className="text-black/50">{alumnos.length} alumnos activos</p>
+          <h1 className="text-2xl font-bold" style={{ fontFamily: 'Syne' }}>Alumnos</h1>
+          <p className="text-gray-500 text-sm">{alumnos.length} alumnos activos</p>
         </div>
         <Link href="/alumnos/nuevo">
           <button className="btn-primary">+ Nuevo alumno</button>
         </Link>
       </div>
 
-      {/* Filtros */}
-      <div className="flex gap-3 mb-6 flex-wrap">
-        <input
-          type="text"
-          placeholder="🔍 Buscar por nombre..."
-          value={busqueda}
-          onChange={e => setBusqueda(e.target.value)}
-          className="input max-w-xs"
-        />
-        <div className="flex gap-2 flex-wrap">
-          {grados.map(g => (
-            <button
-              key={g}
-              onClick={() => setFiltroGrado(g)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                filtroGrado === g ? 'bg-brand-ink text-white' : 'bg-white text-black/60 hover:bg-brand-cream border border-black/10'
-              }`}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
-      </div>
+      <input className="input mb-5" placeholder="🔍 Buscar por nombre, paralelo..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
 
-      {/* Grid de alumnos */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {filtrados.map(alumno => (
-          <AlumnoCard key={alumno.id} alumno={alumno} precioMenu={precioMenu} />
-        ))}
+      <div className="flex flex-col gap-2">
+        {filtrados.map(a => {
+          const color = a.saldo_actual <= 0 ? 'border-[#c0392b]' : a.saldo_actual < 10 ? 'border-[#d4920a]' : 'border-gray-200'
+          const badge = a.saldo_actual <= 0 ? 'badge-red' : a.saldo_actual < 10 ? 'badge-yellow' : 'badge-green'
+          return (
+            <Link key={a.id} href={`/alumnos/${a.id}`}>
+              <div className={`bg-white rounded-2xl px-5 py-4 border-2 ${color} flex items-center gap-4 hover:shadow-md transition-all cursor-pointer`}>
+                <div className="w-11 h-11 rounded-full bg-[#e8f5ec] flex items-center justify-center font-bold text-[#2d8a4e] flex-shrink-0">
+                  {a.nombre[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold">{a.nombre} {a.apellido}</div>
+                  <div className="text-gray-400 text-xs">{a.nivel}° {a.paralelo} {a.alergias ? '· ⚠️ ' + a.alergias : ''}</div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {a.requiere_factura && <span className="badge-blue text-xs">🧾 Factura</span>}
+                  <span className={badge}>{formatUSD(a.saldo_actual)}</span>
+                </div>
+              </div>
+            </Link>
+          )
+        })}
       </div>
-
-      {filtrados.length === 0 && (
-        <div className="text-center py-16 text-black/30">
-          <div className="text-5xl mb-3">🔍</div>
-          <p className="font-display font-bold">No se encontraron alumnos</p>
-        </div>
-      )}
     </div>
-  )
-}
-
-function AlumnoCard({ alumno, precioMenu }: { alumno: SaldoAlumno; precioMenu: number }) {
-  const semaforo = getSemaforo(alumno.saldo_actual, precioMenu)
-  const borderColors = { green: 'border-semaforo-green', yellow: 'border-semaforo-yellow', red: 'border-semaforo-red' }
-  const avatarColors = { green: 'bg-semaforo-green-light', yellow: 'bg-semaforo-yellow-light', red: 'bg-semaforo-red-light' }
-
-  return (
-    <Link href={`/alumnos/${alumno.id}`}>
-      <div className={`card border-2 ${borderColors[semaforo]} cursor-pointer hover:-translate-y-1 transition-all duration-200 text-center`}>
-        <div className={`w-12 h-12 rounded-full ${avatarColors[semaforo]} flex items-center justify-center text-2xl mx-auto mb-3`}>
-          👧
-        </div>
-        <div className="font-display font-bold text-sm leading-tight mb-1">{alumno.nombre}</div>
-        <div className="text-black/40 text-xs mb-3">{alumno.grado}</div>
-        <span className={`badge-${semaforo} text-xs`}>{formatDolar(alumno.saldo_actual)}</span>
-        {alumno.alergias && (
-          <div className="mt-2 text-xs bg-orange-50 text-orange-600 rounded-lg px-2 py-1">
-            ⚠️ {alumno.alergias}
-          </div>
-        )}
-      </div>
-    </Link>
   )
 }
