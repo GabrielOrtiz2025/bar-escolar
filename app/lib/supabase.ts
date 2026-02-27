@@ -34,6 +34,7 @@ export interface Consumo {
   producto_id: string
   producto_nombre?: string
   fecha: string
+  monto: number
   monto_cobrado: number
   created_at: string
   alumno?: Alumno
@@ -45,6 +46,7 @@ export interface Pago {
   alumno_id: string
   monto: number
   tipo_pago: 'efectivo' | 'transferencia'
+  metodo?: string
   numero_comprobante?: string
   comprobante_url?: string
   notas?: string
@@ -63,15 +65,13 @@ export interface SaldoAlumno {
   saldo_actual: number
 }
 
-// Función helper para formatear montos en dólares
+// Funciones helper
 export function formatDolar(monto: number): string {
   return `$${monto.toFixed(2)}`
 }
 
-// Alias para compatibilidad
 export const formatUSD = formatDolar
 
-// Función helper para formatear fechas
 export function formatFecha(fecha: string | Date): string {
   const date = typeof fecha === 'string' ? new Date(fecha) : fecha
   return date.toLocaleDateString('es-EC', { 
@@ -81,7 +81,6 @@ export function formatFecha(fecha: string | Date): string {
   })
 }
 
-// Función helper para formatear fecha y hora
 export function formatFechaHora(fecha: string | Date): string {
   const date = typeof fecha === 'string' ? new Date(fecha) : fecha
   return date.toLocaleString('es-EC', { 
@@ -93,7 +92,6 @@ export function formatFechaHora(fecha: string | Date): string {
   })
 }
 
-// Función helper para obtener la fecha de hoy en formato YYYY-MM-DD
 export function hoy(): string {
   const date = new Date()
   const year = date.getFullYear()
@@ -102,22 +100,18 @@ export function hoy(): string {
   return `${year}-${month}-${day}`
 }
 
-// Función helper para obtener el código del alumno
 export function getCodigoAlumno(alumno: Alumno): string {
   return `${alumno.nivel}${alumno.paralelo}`
 }
 
-// Función helper para obtener el nombre completo del alumno
 export function getNombreCompleto(alumno: Alumno): string {
   return `${alumno.nombre} ${alumno.apellido}`
 }
 
-// Función helper para obtener el identificador completo del alumno
 export function getIdentificadorCompleto(alumno: Alumno): string {
   return `${alumno.nivel}${alumno.paralelo} - ${alumno.nombre} ${alumno.apellido}`
 }
 
-// Función helper para determinar el estado del semáforo según el saldo
 export function getSemaforo(saldo: number): { color: string; texto: string; bgColor: string } {
   if (saldo <= 0) {
     return { 
