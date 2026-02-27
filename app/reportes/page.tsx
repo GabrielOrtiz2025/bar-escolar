@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { supabase, formatDolar, formatFecha, type Alumno, type SaldoAlumno } from '../lib/supabase'
 import { useSearchParams } from 'next/navigation'
 
@@ -12,7 +12,15 @@ type Movimiento = {
   saldo_acumulado: number
 }
 
-export default function ReportesPage() {
+export default function ReportesPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><p className="font-bold text-xl animate-pulse">Cargando...</p></div>}>
+      <ReportesPage />
+    </Suspense>
+  )
+}
+
+function ReportesPage() {
   const searchParams = useSearchParams()
   const alumnoParam = searchParams.get('alumno')
 
