@@ -29,6 +29,15 @@ export interface Producto {
   created_at: string
 }
 
+export interface Precio {
+  id: string
+  tipo_menu: string
+  monto: number
+  vigente_desde: string
+  vigente_hasta?: string
+  created_at: string
+}
+
 export interface Consumo {
   id: string
   alumno_id: string
