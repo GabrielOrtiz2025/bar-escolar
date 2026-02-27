@@ -1,35 +1,19 @@
 'use client'
-
 import { useEffect, useState, Suspense } from 'react'
-import { supabase, formatDolar, formatFecha, type Alumno, type SaldoAlumno } from '../lib/supabase'
+import { supabase, formatUSD, formatFecha, type SaldoAlumno } from '../lib/supabase'
 import { useSearchParams } from 'next/navigation'
 
-type Movimiento = {
-  fecha: string
-  concepto: string
-  debito: number
-  credito: number
-  saldo_acumulado: number
+export default function ReportesWrapper() {
+  return <Suspense fallback={<div className="flex items-center justify-center h-64"><p className="font-bold animate-pulse">Cargando...</p></div>}><ReportesPage /></Suspense>
 }
 
-export default function ReportesPageWrapper() {
-  return (
-    <Suspense fallback={<div className="flex items-center justify-center h-64"><p className="font-bold text-xl animate-pulse">Cargando...</p></div>}>
-      <ReportesPage />
-    </Suspense>
-  )
-}
+type Movimiento = { fecha: string; concepto: string; debito: number; credito: number; saldo: number }
 
 function ReportesPage() {
-  const searchParams = useSearchParams()
-  const alumnoParam = searchParams.get('alumno')
-
-  const [alumnos, setAlumnos] = useState<Alumno[]>([])
-  const [alumnoId, setAlumnoId] = useState(alumnoParam || '')
-  const [desde, setDesde] = useState(() => {
-    const d = new Date(); d.setDate(1)
-    return d.toISOString().split('T')[0]
-  })
+  const params = useSearchParams()
+  const [alumnos, setAlumnos] = useState<SaldoAlumno[]>([])
+  const [alumnoId, setAlumnoId] = useState(params.get('alumno') || '')
+  const [desde, setDesde] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] })
   const [hasta, setHasta] = useState(() => new Date().toISOString().split('T')[0])
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
   const [alumnoInfo, setAlumnoInfo] = useState<SaldoAlumno | null>(null)
@@ -37,152 +21,110 @@ function ReportesPage() {
   const [generado, setGenerado] = useState(false)
 
   useEffect(() => {
-    supabase.from('alumnos').select('*').eq('activo', true).order('nombre')
+    supabase.from('saldos').select('*').eq('activo', true).order('apellido')
       .then(({ data }) => { if (data) setAlumnos(data) })
   }, [])
 
-  async function generarReporte() {
+  async function generar() {
     if (!alumnoId) { alert('Seleccioná un alumno'); return }
-    setLoading(true)
-    setGenerado(false)
-
-    const [{ data: saldoData }, { data: consumosData }, { data: pagosData }] = await Promise.all([
+    setLoading(true); setGenerado(false)
+    const [{ data: a }, { data: c }, { data: p }] = await Promise.all([
       supabase.from('saldos').select('*').eq('id', alumnoId).single(),
       supabase.from('consumos').select('*').eq('alumno_id', alumnoId).gte('fecha', desde).lte('fecha', hasta).order('fecha'),
       supabase.from('pagos').select('*').eq('alumno_id', alumnoId).gte('fecha', desde).lte('fecha', hasta).order('fecha'),
     ])
-
-    if (saldoData) setAlumnoInfo(saldoData)
-
-    // Unificar y ordenar movimientos
+    if (a) setAlumnoInfo(a)
     const todos = [
-      ...(consumosData || []).map((c: any) => ({
-        fecha: c.fecha,
-        concepto: c.ausente ? '🏠 Inasistencia (sin cobro)' : `🍱 ${c.tipo_menu}`,
-        debito: c.ausente ? 0 : c.monto_cobrado,
-        credito: 0,
-        _ts: new Date(c.fecha).getTime(),
-      })),
-      ...(pagosData || []).map((p: any) => ({
-        fecha: p.fecha.split('T')[0],
-        concepto: '💳 Recarga de saldo',
-        debito: 0,
-        credito: p.monto,
-        _ts: new Date(p.fecha).getTime(),
-      })),
+      ...(c || []).map((x: any) => ({ fecha: x.fecha, concepto: '🍱 ' + x.producto_nombre, debito: x.monto, credito: 0, _ts: new Date(x.fecha).getTime() })),
+      ...(p || []).map((x: any) => ({ fecha: x.fecha.split('T')[0], concepto: x.metodo === 'efectivo' ? '💵 Pago efectivo' : '🏦 Transferencia' + (x.numero_comprobante ? ' #' + x.numero_comprobante : ''), debito: 0, credito: x.monto, _ts: new Date(x.fecha).getTime() })),
     ].sort((a, b) => a._ts - b._ts)
-
-    // Calcular saldo acumulado progresivo
     let saldo = 0
-    const conSaldo: Movimiento[] = todos.map(m => {
-      saldo += m.credito - m.debito
-      return { fecha: m.fecha, concepto: m.concepto, debito: m.debito, credito: m.credito, saldo_acumulado: saldo }
-    })
-
-    setMovimientos(conSaldo)
-    setLoading(false)
-    setGenerado(true)
+    setMovimientos(todos.map(m => { saldo += m.credito - m.debito; return { fecha: m.fecha, concepto: m.concepto, debito: m.debito, credito: m.credito, saldo } }))
+    setLoading(false); setGenerado(true)
   }
 
-  function imprimirPDF() {
-    window.print()
-  }
-
-  const alumnoSeleccionado = alumnos.find(a => a.id === alumnoId)
+  const alumnoSel = alumnos.find(a => a.id === alumnoId)
 
   return (
-    <div className="p-8 animate-in">
-      <h1 className="font-display font-black text-3xl tracking-tight mb-2">Reportes PDF</h1>
-      <p className="text-black/50 mb-8">Generá estados de cuenta para enviar a los padres</p>
+    <div className="p-6 fade-in">
+      <h1 className="text-2xl font-bold mb-6" style={{ fontFamily: 'Syne' }}>Reportes</h1>
 
       {/* Filtros */}
-      <div className="card mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+      <div className="card mb-5">
+        <div className="grid grid-cols-3 gap-4 mb-4">
           <div>
-            <label className="block text-xs font-bold text-black/50 uppercase tracking-wide mb-2">Alumno</label>
+            <label className="label">Alumno</label>
             <select className="input" value={alumnoId} onChange={e => { setAlumnoId(e.target.value); setGenerado(false) }}>
               <option value="">— Seleccioná —</option>
-              {alumnos.map(a => <option key={a.id} value={a.id}>{a.nombre} — {a.grado}</option>)}
+              {alumnos.map(a => <option key={a.id} value={a.id}>{a.nivel}° {a.paralelo} — {a.nombre} {a.apellido}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-black/50 uppercase tracking-wide mb-2">Desde</label>
+            <label className="label">Desde</label>
             <input type="date" className="input" value={desde} onChange={e => { setDesde(e.target.value); setGenerado(false) }} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-black/50 uppercase tracking-wide mb-2">Hasta</label>
+            <label className="label">Hasta</label>
             <input type="date" className="input" value={hasta} onChange={e => { setHasta(e.target.value); setGenerado(false) }} />
           </div>
         </div>
         <div className="flex gap-3">
-          <button className="btn-primary" onClick={generarReporte} disabled={loading}>
-            {loading ? '⏳ Generando...' : '📊 Generar reporte'}
-          </button>
-          {generado && (
-            <button className="btn-outline" onClick={imprimirPDF}>🖨️ Imprimir / Guardar PDF</button>
-          )}
+          <button className="btn-primary" onClick={generar} disabled={loading}>{loading ? '⏳ Generando...' : '📊 Generar reporte'}</button>
+          {generado && <button className="btn-outline" onClick={() => window.print()}>🖨️ Imprimir / PDF</button>}
         </div>
       </div>
 
-      {/* Reporte generado */}
+      {/* Reporte */}
       {generado && alumnoInfo && (
-        <div className="card" id="reporte-pdf">
-          {/* Header del reporte */}
-          <div className="flex items-start justify-between mb-6 pb-6 border-b border-black/10">
+        <div className="card fade-in">
+          <div className="flex items-start justify-between mb-5 pb-5 border-b border-gray-100">
             <div>
-              <h2 className="font-display font-black text-2xl mb-1">{alumnoInfo.nombre}</h2>
-              <p className="text-black/50">{alumnoInfo.grado}</p>
-              <p className="text-black/40 text-sm mt-1">
-                Período: {formatFecha(desde)} al {formatFecha(hasta)}
-              </p>
+              <h2 className="font-bold text-xl">{alumnoInfo.nombre} {alumnoInfo.apellido}</h2>
+              <p className="text-gray-500 text-sm">{alumnoInfo.nivel}° {alumnoInfo.paralelo}</p>
+              <p className="text-gray-400 text-xs mt-1">Período: {formatFecha(desde)} al {formatFecha(hasta)}</p>
+              {alumnoInfo.requiere_factura && <span className="badge-blue text-xs mt-1 inline-block">🧾 Requiere factura</span>}
             </div>
             <div className="text-right">
-              <div className="font-display font-black text-3xl">{formatDolar(alumnoInfo.saldo_actual)}</div>
-              <div className="text-black/40 text-sm">Saldo actual</div>
+              <div className={`font-bold text-2xl ${alumnoInfo.saldo_actual >= 0 ? 'text-[#2d8a4e]' : 'text-[#c0392b]'}`}>{formatUSD(alumnoInfo.saldo_actual)}</div>
+              <div className="text-gray-400 text-xs">Saldo actual</div>
             </div>
           </div>
 
-          {/* Tabla de movimientos */}
-          {movimientos.length === 0 ? (
-            <p className="text-center text-black/30 py-8">Sin movimientos en este período</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-brand-cream">
-                    <th className="text-left px-4 py-3 font-bold text-black/50 text-xs uppercase tracking-wide rounded-l-xl">Fecha</th>
-                    <th className="text-left px-4 py-3 font-bold text-black/50 text-xs uppercase tracking-wide">Concepto</th>
-                    <th className="text-right px-4 py-3 font-bold text-black/50 text-xs uppercase tracking-wide">Débito</th>
-                    <th className="text-right px-4 py-3 font-bold text-black/50 text-xs uppercase tracking-wide">Crédito</th>
-                    <th className="text-right px-4 py-3 font-bold text-black/50 text-xs uppercase tracking-wide rounded-r-xl">Saldo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movimientos.map((m, i) => (
-                    <tr key={i} className={`border-b border-black/5 ${i % 2 === 0 ? '' : 'bg-black/1'}`}>
-                      <td className="px-4 py-3 text-black/50">{formatFecha(m.fecha)}</td>
-                      <td className="px-4 py-3">{m.concepto}</td>
-                      <td className="px-4 py-3 text-right text-semaforo-red font-semibold">
-                        {m.debito > 0 ? `-${formatDolar(m.debito)}` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-semaforo-green font-semibold">
-                        {m.credito > 0 ? `+${formatDolar(m.credito)}` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold">{formatDolar(m.saldo_acumulado)}</td>
+          {movimientos.length === 0
+            ? <p className="text-center text-gray-400 py-8">Sin movimientos en este período</p>
+            : <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[#f4f1eb]">
+                      <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase rounded-l-xl">Fecha</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase">Concepto</th>
+                      <th className="text-right px-4 py-3 text-xs font-bold text-gray-500 uppercase">Débito</th>
+                      <th className="text-right px-4 py-3 text-xs font-bold text-gray-500 uppercase">Crédito</th>
+                      <th className="text-right px-4 py-3 text-xs font-bold text-gray-500 uppercase rounded-r-xl">Saldo</th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-semaforo-green-light">
-                    <td colSpan={4} className="px-4 py-3 font-display font-bold">SALDO FINAL DEL PERÍODO</td>
-                    <td className="px-4 py-3 text-right font-display font-black text-lg text-semaforo-green">
-                      {movimientos.length > 0 ? formatDolar(movimientos[movimientos.length - 1].saldo_acumulado) : formatDolar(0)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {movimientos.map((m, i) => (
+                      <tr key={i} className="border-b border-gray-50">
+                        <td className="px-4 py-3 text-gray-400">{formatFecha(m.fecha)}</td>
+                        <td className="px-4 py-3">{m.concepto}</td>
+                        <td className="px-4 py-3 text-right text-[#c0392b] font-semibold">{m.debito > 0 ? `-${formatUSD(m.debito)}` : '—'}</td>
+                        <td className="px-4 py-3 text-right text-[#2d8a4e] font-semibold">{m.credito > 0 ? `+${formatUSD(m.credito)}` : '—'}</td>
+                        <td className="px-4 py-3 text-right font-bold">{formatUSD(m.saldo)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-[#e8f5ec]">
+                      <td colSpan={4} className="px-4 py-3 font-bold">Saldo del período</td>
+                      <td className="px-4 py-3 text-right font-bold text-[#2d8a4e] text-lg">
+                        {movimientos.length > 0 ? formatUSD(movimientos[movimientos.length - 1].saldo) : formatUSD(0)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+          }
         </div>
       )}
     </div>
