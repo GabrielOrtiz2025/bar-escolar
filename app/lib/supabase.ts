@@ -32,6 +32,7 @@ export interface Consumo {
   id: string
   alumno_id: string
   producto_id: string
+  producto_nombre?: string
   fecha: string
   monto_cobrado: number
   created_at: string
