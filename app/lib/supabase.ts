@@ -52,6 +52,16 @@ export interface Pago {
   alumno?: Alumno
 }
 
+export interface SaldoAlumno {
+  alumno_id: string
+  nombre_completo: string
+  nivel: string
+  paralelo: string
+  total_pagado: number
+  total_consumido: number
+  saldo_actual: number
+}
+
 // Función helper para formatear montos en dólares
 export function formatDolar(monto: number): string {
   return `$${monto.toFixed(2)}`
