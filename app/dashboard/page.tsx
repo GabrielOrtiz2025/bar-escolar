@@ -1,139 +1,164 @@
 'use client'
-
 import { useEffect, useState } from 'react'
-import { supabase, getSemaforo, formatDolar, type SaldoAlumno, type Precio } from '../lib/supabase'
+import { supabase, formatUSD, type SaldoAlumno } from '../lib/supabase'
 import Link from 'next/link'
 
-export default function DashboardPage() {
-  const [saldos, setSaldos] = useState<SaldoAlumno[]>([])
-  const [precioActual, setPrecioActual] = useState<number>(0)
+type Resumen = {
+  efectivo: number
+  transferencia: number
+  total: number
+  consumos: number
+}
+
+export default function Dashboard() {
+  const [alumnos, setAlumnos] = useState<SaldoAlumno[]>([])
+  const [hoy, setHoy] = useState<Resumen>({ efectivo: 0, transferencia: 0, total: 0, consumos: 0 })
+  const [semana, setSemana] = useState<Resumen>({ efectivo: 0, transferencia: 0, total: 0, consumos: 0 })
+  const [mes, setMes] = useState<Resumen>({ efectivo: 0, transferencia: 0, total: 0, consumos: 0 })
   const [loading, setLoading] = useState(true)
-  const [hoy] = useState(new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))
 
   useEffect(() => {
-    async function cargarDatos() {
-      // Cargar saldos
-      const { data: saldosData } = await supabase
-        .from('saldos')
-        .select('*')
-        .eq('activo', true)
-        .order('nombre')
+    async function cargar() {
+      const ahora = new Date()
+      const todayStr = ahora.toISOString().split('T')[0]
 
-      // Cargar precio vigente
-      const { data: precioData } = await supabase
-        .from('precios')
-        .select('*')
-        .eq('tipo_menu', 'Almuerzo')
-        .is('vigente_hasta', null)
-        .single()
+      // Inicio de semana (lunes)
+      const diaSemana = ahora.getDay() || 7
+      const lunes = new Date(ahora)
+      lunes.setDate(ahora.getDate() - diaSemana + 1)
+      const lunesStr = lunes.toISOString().split('T')[0]
 
-      if (saldosData) setSaldos(saldosData)
-      if (precioData) setPrecioActual(precioData.monto)
+      // Inicio de mes
+      const inicioMes = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-01`
+
+      const [{ data: saldosData }, { data: consumosData }, { data: pagosData }] = await Promise.all([
+        supabase.from('saldos').select('*').eq('activo', true),
+        supabase.from('consumos').select('*').gte('fecha', inicioMes),
+        supabase.from('pagos').select('*').gte('fecha', inicioMes),
+      ])
+
+      if (saldosData) setAlumnos(saldosData)
+
+      const calcularResumen = (desde: string, hasta: string): Resumen => {
+        const c = (consumosData || []).filter((x: any) => x.fecha >= desde && x.fecha <= hasta)
+        const p = (pagosData || []).filter((x: any) => x.fecha.split('T')[0] >= desde && x.fecha.split('T')[0] <= hasta)
+        const ef = p.filter((x: any) => x.metodo === 'efectivo').reduce((s: number, x: any) => s + x.monto, 0)
+        const tr = p.filter((x: any) => x.metodo === 'transferencia').reduce((s: number, x: any) => s + x.monto, 0)
+        return { efectivo: ef, transferencia: tr, total: ef + tr, consumos: c.length }
+      }
+
+      setHoy(calcularResumen(todayStr, todayStr))
+      setSemana(calcularResumen(lunesStr, todayStr))
+      setMes(calcularResumen(inicioMes, todayStr))
       setLoading(false)
     }
-    cargarDatos()
+    cargar()
   }, [])
 
-  const ok = saldos.filter(s => getSemaforo(s.saldo_actual, precioActual) === 'green')
-  const bajo = saldos.filter(s => getSemaforo(s.saldo_actual, precioActual) === 'yellow')
-  const sinCredito = saldos.filter(s => getSemaforo(s.saldo_actual, precioActual) === 'red')
+  const sinCredito = alumnos.filter(a => a.saldo_actual <= 0)
+  const saldoBajo = alumnos.filter(a => a.saldo_actual > 0 && a.saldo_actual < 10)
 
-  if (loading) return <LoadingScreen />
+  if (loading) return <Loading />
+
+  const fechaHoy = new Date().toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
-    <div className="p-8 animate-in">
+    <div className="p-8 fade-in">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="font-display font-black text-3xl tracking-tight mb-1">Buenos días 👋</h1>
-        <p className="text-black/50 capitalize">{hoy} · Precio almuerzo: <strong className="text-black">{formatDolar(precioActual)}</strong></p>
+        <h1 className="text-3xl font-bold tracking-tight mb-1" style={{ fontFamily: 'Syne' }}>Panel de Control</h1>
+        <p className="text-gray-500 capitalize">{fechaHoy}</p>
       </div>
 
-      {/* Semáforo stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total alumnos" value={saldos.length} color="blue" />
-        <StatCard label="Saldo OK" value={ok.length} color="green" />
-        <StatCard label="Saldo bajo" value={bajo.length} color="yellow" />
-        <StatCard label="Sin crédito" value={sinCredito.length} color="red" />
-      </div>
-
-      {/* Alertas */}
+      {/* Alertas urgentes */}
       {sinCredito.length > 0 && (
-        <div className="bg-semaforo-red-light border-l-4 border-semaforo-red rounded-xl p-4 mb-4 flex gap-3 items-start">
-          <span className="text-xl">🔴</span>
+        <div className="bg-[#fdecea] border-l-4 border-[#c0392b] rounded-2xl p-4 mb-4 flex gap-3">
+          <span className="text-2xl">🔴</span>
           <div>
-            <p className="font-semibold text-semaforo-red text-sm">Sin crédito — No debitar</p>
-            <p className="text-semaforo-red/80 text-sm mt-0.5">
-              {sinCredito.map(s => s.nombre).join(', ')}
-            </p>
+            <p className="font-bold text-[#c0392b]">Sin crédito — No registrar consumo</p>
+            <p className="text-[#c0392b]/80 text-sm mt-0.5">{sinCredito.map(a => `${a.nombre} ${a.apellido}`).join(' · ')}</p>
           </div>
         </div>
       )}
-      {bajo.length > 0 && (
-        <div className="bg-semaforo-yellow-light border-l-4 border-semaforo-yellow rounded-xl p-4 mb-6 flex gap-3 items-start">
-          <span className="text-xl">⚠️</span>
+      {saldoBajo.length > 0 && (
+        <div className="bg-[#fef8e7] border-l-4 border-[#d4920a] rounded-2xl p-4 mb-6 flex gap-3">
+          <span className="text-2xl">⚠️</span>
           <div>
-            <p className="font-semibold text-semaforo-yellow text-sm">Saldo bajo — Avisar a los padres</p>
-            <p className="text-semaforo-yellow/80 text-sm mt-0.5">
-              {bajo.map(s => s.nombre).join(', ')}
-            </p>
+            <p className="font-bold text-[#d4920a]">Saldo bajo — Avisar a los padres</p>
+            <p className="text-[#d4920a]/80 text-sm mt-0.5">{saldoBajo.map(a => `${a.nombre} ${a.apellido}`).join(' · ')}</p>
           </div>
         </div>
       )}
 
       {/* Acciones rápidas */}
-      <h2 className="font-display font-bold text-lg mb-4">Acciones del día</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Link href="/pase-lista">
-          <ActionCard icon="✅" title="Pase de Lista" desc="Marcar consumos del día" color="green" />
+      <div className="grid grid-cols-2 gap-4 mb-8">
+        <Link href="/consumos">
+          <div className="card border-2 border-transparent hover:border-[#2d8a4e] hover:bg-[#e8f5ec] cursor-pointer transition-all group">
+            <div className="text-4xl mb-3">🍱</div>
+            <div className="font-bold text-lg">Registrar Consumo</div>
+            <div className="text-gray-500 text-sm mt-1">Buscar alumno y registrar qué comió hoy</div>
+          </div>
         </Link>
         <Link href="/pagos/nuevo">
-          <ActionCard icon="💳" title="Registrar Pago" desc="Acreditar saldo a un alumno" color="blue" />
+          <div className="card border-2 border-transparent hover:border-[#2563eb] hover:bg-[#eff6ff] cursor-pointer transition-all">
+            <div className="text-4xl mb-3">💳</div>
+            <div className="font-bold text-lg">Registrar Pago</div>
+            <div className="text-gray-500 text-sm mt-1">Acreditar saldo en efectivo o transferencia</div>
+          </div>
         </Link>
-        <Link href="/reportes">
-          <ActionCard icon="📄" title="Generar Reporte" desc="Estado de cuenta en PDF" color="orange" />
-        </Link>
+      </div>
+
+      {/* Ingresos */}
+      <h2 className="font-bold text-lg mb-4" style={{ fontFamily: 'Syne' }}>Ingresos por cobros</h2>
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        <IngresoCard titulo="Hoy" data={hoy} />
+        <IngresoCard titulo="Esta semana" data={semana} />
+        <IngresoCard titulo="Este mes" data={mes} />
+      </div>
+
+      {/* Semáforo alumnos */}
+      <h2 className="font-bold text-lg mb-4" style={{ fontFamily: 'Syne' }}>Estado de saldos</h2>
+      <div className="grid grid-cols-3 gap-4">
+        <div className="card text-center border-2 border-[#2d8a4e]">
+          <div className="text-3xl font-bold text-[#2d8a4e]">{alumnos.filter(a => a.saldo_actual > 10).length}</div>
+          <div className="text-sm text-gray-500 mt-1">🟢 Saldo OK</div>
+        </div>
+        <div className="card text-center border-2 border-[#d4920a]">
+          <div className="text-3xl font-bold text-[#d4920a]">{saldoBajo.length}</div>
+          <div className="text-sm text-gray-500 mt-1">🟡 Saldo bajo</div>
+        </div>
+        <div className="card text-center border-2 border-[#c0392b]">
+          <div className="text-3xl font-bold text-[#c0392b]">{sinCredito.length}</div>
+          <div className="text-sm text-gray-500 mt-1">🔴 Sin crédito</div>
+        </div>
       </div>
     </div>
   )
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
-  const colors: Record<string, string> = {
-    blue: 'text-blue-600',
-    green: 'text-semaforo-green',
-    yellow: 'text-semaforo-yellow',
-    red: 'text-semaforo-red',
-  }
+function IngresoCard({ titulo, data }: { titulo: string; data: Resumen }) {
   return (
-    <div className="card text-center">
-      <div className={`font-display font-black text-4xl ${colors[color]}`}>{value}</div>
-      <div className="text-black/40 text-xs uppercase tracking-wide mt-1">{label}</div>
-    </div>
-  )
-}
-
-function ActionCard({ icon, title, desc, color }: { icon: string; title: string; desc: string; color: string }) {
-  const colors: Record<string, string> = {
-    green: 'hover:border-semaforo-green hover:bg-semaforo-green-light',
-    blue: 'hover:border-blue-400 hover:bg-blue-50',
-    orange: 'hover:border-brand-orange hover:bg-orange-50',
-  }
-  return (
-    <div className={`card border-2 border-transparent cursor-pointer transition-all duration-200 ${colors[color]}`}>
-      <div className="text-3xl mb-3">{icon}</div>
-      <div className="font-display font-bold text-base">{title}</div>
-      <div className="text-black/50 text-sm mt-1">{desc}</div>
-    </div>
-  )
-}
-
-function LoadingScreen() {
-  return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="text-center">
-        <div className="text-4xl mb-4 animate-pulse">🍱</div>
-        <p className="font-display font-bold text-xl">Cargando...</p>
+    <div className="card">
+      <div className="font-bold text-sm text-gray-500 mb-3 uppercase tracking-wide">{titulo}</div>
+      <div className="font-bold text-2xl mb-3">{formatUSD(data.total)}</div>
+      <div className="flex flex-col gap-1.5 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-500">💵 Efectivo</span>
+          <span className="font-semibold text-[#2d8a4e]">{formatUSD(data.efectivo)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">🏦 Transferencia</span>
+          <span className="font-semibold text-[#2563eb]">{formatUSD(data.transferencia)}</span>
+        </div>
+        <div className="flex justify-between border-t border-gray-100 pt-1.5 mt-0.5">
+          <span className="text-gray-500">🍱 Consumos</span>
+          <span className="font-semibold">{data.consumos}</span>
+        </div>
       </div>
     </div>
   )
+}
+
+function Loading() {
+  return <div className="flex items-center justify-center h-screen"><p className="font-bold text-xl animate-pulse">Cargando...</p></div>
 }
