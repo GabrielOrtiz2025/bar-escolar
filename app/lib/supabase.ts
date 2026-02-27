@@ -60,6 +60,28 @@ export function formatDolar(monto: number): string {
 // Alias para compatibilidad
 export const formatUSD = formatDolar
 
+// Función helper para formatear fechas
+export function formatFecha(fecha: string | Date): string {
+  const date = typeof fecha === 'string' ? new Date(fecha) : fecha
+  return date.toLocaleDateString('es-EC', { 
+    year: 'numeric', 
+    month: '2-digit', 
+    day: '2-digit' 
+  })
+}
+
+// Función helper para formatear fecha y hora
+export function formatFechaHora(fecha: string | Date): string {
+  const date = typeof fecha === 'string' ? new Date(fecha) : fecha
+  return date.toLocaleString('es-EC', { 
+    year: 'numeric', 
+    month: '2-digit', 
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 // Función helper para obtener el código del alumno
 export function getCodigoAlumno(alumno: Alumno): string {
   return `${alumno.nivel}${alumno.paralelo}`
