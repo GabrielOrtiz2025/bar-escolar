@@ -1,11 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { supabase, formatDolar, type Alumno } from '../../lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-export default function NuevoPagoPage() {
+export default function NuevoPagoPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><p className="font-bold text-xl animate-pulse">Cargando...</p></div>}>
+      <NuevoPagoPage />
+    </Suspense>
+  )
+}
+
+function NuevoPagoPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const alumnoPreseleccionado = searchParams.get('alumno')
